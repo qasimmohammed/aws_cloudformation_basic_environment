@@ -107,10 +107,32 @@ Resources:
       Tags: 
       - Key: Name
         Value: !Sub NAT-${AWS::StackName}
-  ##############################
-  ##### Creating an EIP
-  ############################## 
+  ##attaching an EIP
   ElasticIPAddress:
     Type: AWS::EC2::EIP
     Properties:
       Domain: VPC
+
+  ##############################
+  ##### Adding an ec2 Instance to act as a Bastion Host
+  ############################## 
+  EC2:
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list
+      ImageId: ami-0915bcb5fa77e4892
+      InstanceType: t3a.micro
+      #KeyName: String
+      #SecurityGroupIds: 
+      #  - String
+      #SecurityGroups: 
+      #  - String
+      SubnetId: !Ref PublicSubnetA
+      Tags: 
+        - Key: Name
+          Value: !Sub EC2-${AWS::StackName}
+  ElasticIPAddressEC2:
+    Type: AWS::EC2::EIP
+    Properties: 
+      Domain: EC2
+      InstanceId: !Ref EC2
