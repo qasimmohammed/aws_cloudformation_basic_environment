@@ -1,7 +1,9 @@
 AWSTemplateFormatVersion: 2010-09-09
 # This CloudFormation template deploys a basic VPC / Network. 
 Resources:
-  # Starting with a VPC:
+  ##############################
+  #### Starting with a VPC:
+  ##############################
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -11,8 +13,9 @@ Resources:
       Tags:
       - Key: Name
         Value:  !Join ['', [!Ref "AWS::StackName", "-VPC" ]]
-
-   # In order to access the internet, we will need an IGW    
+  ##############################
+  #### # In order to access the internet, we will need an IGW   
+  ############################## 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     DependsOn: VPC
@@ -22,8 +25,9 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
-
-  # Now to create some subnets: 1 public and 1 private. The most basic of basic infrastructure
+  ##############################
+  ##### Now to create some subnets: 1 public and 1 private. The most basic of basic infrastructure
+  ############################## 
   PublicSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -43,5 +47,70 @@ Resources:
       Tags:
       - Key: Name
         Value: !Sub ${AWS::StackName}-Private-A
+  ##############################
+  ##### Creating Routes for the Subnets:
+  ############################## 
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Public
+  PublicRoute1:   # Public route table has direct routing to IGW:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      
+  # Here is a private route table:
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: Private
+  PrivateRoute1:            # Private route table can access web via NAT (created below)
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      # Route traffic through the NAT Gateway:
+      NatGatewayId: !Ref NATGateway
+  ##############################
+  ##### Attach the public subnet to public route tables, 
+  ##### and attach the private subnet to private route tables:    
+  ##############################    
 
-        
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  ##############################
+  ##### Creating a NAT Gateway in order for the Private Subnet to connect to the internet
+  ############################## 
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt ElasticIPAddress.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags: 
+      - Key: Name
+        Value: !Sub NAT-${AWS::StackName}
+  ##############################
+  ##### Creating an EIP
+  ############################## 
+  ElasticIPAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: VPC
